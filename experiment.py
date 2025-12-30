@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 from typing import Dict, List, Tuple
-from config import MODELS, GENERATION_PROMPT, RATING_PROMPT_TEMPLATE
+from config import MODELS, GENERATION_PROMPTS, RATING_PROMPT_TEMPLATE
 from llm_client import LLMClient
 from storage import Storage
 
@@ -11,17 +11,29 @@ class ExperimentRunner:
         self.storage = Storage()
 
     async def run_generation(self):
-        print(f"--- Starting Generation Phase for {len(MODELS)} models ---")
-        for model in MODELS:
-            if self.storage.generation_exists(model):
-                print(f"[SKIP] Model {model} already has generated text.")
-                continue
-            
-            print(f"\n\n-------\n[[GEN] Generating text for {model}...")
-            text = await self.client.query(model, GENERATION_PROMPT)
+        print(f"--- Starting Generation Phase for {len(MODELS)} models x {len(GENERATION_PROMPTS)} prompts ---")
+        
+        sem = asyncio.Semaphore(10)
+        tasks = []
+
+        for i, prompt in enumerate(GENERATION_PROMPTS):
+            print(f"\n>> Prompt {i+1}/{len(GENERATION_PROMPTS)}")
+            for model in MODELS:
+                tasks.append(self._generate_single(sem, model, prompt, i))
+        
+        await asyncio.gather(*tasks)
+
+    async def _generate_single(self, sem: asyncio.Semaphore, model: str, prompt: str, prompt_idx: int):
+        async with sem:
+            if self.storage.generation_exists(model, prompt_idx):
+                print(f"[SKIP] Model {model} already has generated text for prompt {prompt_idx}.")
+                return
+
+            print(f"\n----\n[GEN] Generating text for {model} (Prompt {prompt_idx})...")
+            text = await self.client.query(model, prompt)
             
             if text:
-                self.storage.save_generation(model, text)
+                self.storage.save_generation(model, text, prompt_idx)
                 print(f"[OK] Saved generation for {model}.")
             else:
                 print(f"[ERR] Failed to generate for {model}.")
@@ -32,58 +44,73 @@ class ExperimentRunner:
         return hashlib.md5(combined.encode()).hexdigest()
 
     async def run_rating(self):
-        generations = self.storage.load_generations()
-        if len(generations) < 2:
-            print("Not enough generations to run ratings. Run generation phase first.")
+        # generations is now { "0": {model: text}, "1": {...} }
+        generations_data = self.storage.load_generations()
+        if not generations_data:
+            print("No generations found. Run generation phase first.")
             return
 
         print(f"--- Starting Rating Phase ---")
         
+        sem = asyncio.Semaphore(10)
+        tasks = []
+        
         # We need to pair every model's text with every other model's text
         # And ask EACH model to judge.
+        # CRITICAL: Only compare stories from the SAME prompt.
         
-        for judge_model in MODELS:
-            print(f"\n\n-------\n[JUDGE] Judge Model: {judge_model}")
+        for prompt_idx_str, model_map in generations_data.items():
+            print(f"\n\n=== Rating stories for Prompt Index {prompt_idx_str} ===")
             
-            for model_a in MODELS:
-                for model_b in MODELS:
-                    if model_a == model_b:
-                        continue # Don't compare same text against itself
-                    
-                    text_a = generations.get(model_a)
-                    text_b = generations.get(model_b)
-                    
-                    if not text_a or not text_b:
-                        continue
-
-                    # Check if already rated
-                    key = self._get_rating_key(text_a, text_b)
-                    existing_ratings = self.storage.load_ratings().get(judge_model, {})
-                    if key in existing_ratings:
-                        print(f"[SKIP] Already rated {model_a} vs {model_b}")
-                        continue
-
-                    # Construct Prompt
-                    prompt = RATING_PROMPT_TEMPLATE.replace("{text_a}", text_a).replace("{text_b}", text_b)
-                    
-                    # Get Rating
-                    print(f"\n[RATE] Comparing {model_a} vs {model_b}...")
-                    response = await self.client.query(judge_model, prompt)
-                    
-                    winner = None
-                    if response:
-                        clean_resp = response.strip().upper()
-                        if "A" in clean_resp and "B" not in clean_resp:
-                            winner = "A"
-                        elif "B" in clean_resp and "A" not in clean_resp:
-                            winner = "B"
+            for judge_model in MODELS:
+                # print(f"\n----\n[JUDGE] Judge Model: {judge_model}")
+                
+                for model_a in MODELS:
+                    for model_b in MODELS:
+                        if model_a == model_b:
+                            continue # Don't compare same text against itself
                         
-                        # Handle simple "Model A" cases if mock is loose, but mock is strict "A" or "B"
-                        if clean_resp == "A" or clean_resp == "B":
-                             winner = clean_resp
+                        text_a = model_map.get(model_a)
+                        text_b = model_map.get(model_b)
+                        
+                        if not text_a or not text_b:
+                            # Could happen if one model failed generation for this prompt
+                            continue
+                        
+                        tasks.append(self._rate_single(sem, judge_model, model_a, model_b, text_a, text_b))
 
-                    if winner:
-                        self.storage.save_rating(judge_model, key, winner)
-                        print(f"[DECISION] Winner: {winner}")
-                    else:
-                        print(f"[ERR] invalid response: {response}")
+        await asyncio.gather(*tasks)
+
+    async def _rate_single(self, sem: asyncio.Semaphore, judge_model: str, model_a: str, model_b: str, text_a: str, text_b: str):
+        async with sem:
+            # Check if already rated
+            key = self._get_rating_key(text_a, text_b)
+            existing_ratings = self.storage.load_ratings().get(judge_model, {})
+            if key in existing_ratings:
+                # print(f"[SKIP] Already rated {model_a} vs {model_b}")
+                return
+
+            # Construct Prompt
+            prompt = RATING_PROMPT_TEMPLATE.replace("{text_a}", text_a).replace("{text_b}", text_b)
+            
+            # Get Rating
+            print(f"\n[RATE] Comparing {model_a} vs {model_b} (Judge: {judge_model})...")
+            response = await self.client.query(judge_model, prompt)
+            
+            winner = None
+            if response:
+                clean_resp = response.strip().upper()
+                if "A" in clean_resp and "B" not in clean_resp:
+                    winner = "A"
+                elif "B" in clean_resp and "A" not in clean_resp:
+                    winner = "B"
+                
+                # Handle simple "Model A" cases if mock is loose, but mock is strict "A" or "B"
+                if clean_resp == "A" or clean_resp == "B":
+                        winner = clean_resp
+
+            if winner:
+                self.storage.save_rating(judge_model, key, winner)
+                print(f"[DECISION] Winner: {winner} (Judge: {judge_model})")
+            else:
+                print(f"[ERR] invalid response: {response} (Judge: {judge_model})")

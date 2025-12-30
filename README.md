@@ -62,7 +62,7 @@ Run the experiment pipeline in three main steps:
 
 The project configuration is managed in `config.py`. You can modify:
 - `MODELS`: The list of LLMs involved in the experiment.
-- `PROMPTS`: The set of evaluation prompts.
+- `PROMPTS`: The list of evaluation prompts to generate responses for.
 - `USE_MOCK`: Set to `True` for testing without API costs.
 
 ## 📁 Project Structure

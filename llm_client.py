@@ -1,5 +1,6 @@
 import httpx
 import random
+import asyncio
 from typing import Optional
 from config import USE_MOCK, OPENROUTER_API_KEY, OPENROUTER_API_URL
 
@@ -10,11 +11,26 @@ class LLMClient:
     async def query(self, model: str, prompt: str) -> Optional[str]:
         """
         Sends a query to the LLM or returns a mock response.
+        Retries up to 3 times with exponential backoff.
         """
         if self.use_mock:
             return self._mock_response(model, prompt)
         
-        return await self._real_query(model, prompt)
+        retries = 3
+        base_delay = 2
+
+        for attempt in range(retries):
+            result = await self._real_query(model, prompt)
+            if result:
+                return result
+            
+            if attempt < retries - 1:
+                delay = base_delay * (2 ** attempt)
+                print(f"[WARN] Retrying query for {model} in {delay}s (Attempt {attempt + 1}/{retries})...")
+                await asyncio.sleep(delay)
+        
+        print(f"[ERR] Failed to query {model} after {retries} attempts.")
+        return None
 
     def _mock_response(self, model: str, prompt: str) -> str:
         """Generates a mock response based on the prompt type."""

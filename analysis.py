@@ -1,8 +1,26 @@
 from storage import Storage
-from config import MODELS
+from config import MODELS, DATA_DIR
 import hashlib
 from collections import defaultdict
 import math
+import os
+
+class ReportLogger:
+    def __init__(self, filename="analysis_report.txt"):
+        self.filepath = os.path.join(DATA_DIR, filename)
+        self.buffer = []
+
+    def log(self, msg=""):
+        print(msg)
+        self.buffer.append(str(msg))
+
+    def save(self):
+        try:
+            with open(self.filepath, 'w', encoding='utf-8') as f:
+                f.write("\n".join(self.buffer))
+            print(f"[INFO] Report saved to {self.filepath}")
+        except Exception as e:
+            print(f"[ERR] Failed to save report: {e}")
 
 def _get_rating_key(text_a: str, text_b: str) -> str:
     combined = f"{text_a}||{text_b}"
@@ -47,23 +65,26 @@ def calculate_bias_uncertainty(wins1, attempts1, wins2, attempts2):
     return margin_of_error * 100  # Convert to percentage
 
 def get_matches(storage):
-    generations = storage.load_generations()
+    generations_data = storage.load_generations() # { prompt_idx: {model: text} }
     ratings = storage.load_ratings()
     matches = []
     
     # Pre-compute hash map for all pairs to avoid O(N^4) lookups
     # Map: key -> (model_A, model_B)
     key_map = {}
-    for m1 in MODELS:
-        for m2 in MODELS:
-            if m1 == m2: continue
-            
-            t1 = generations.get(m1)
-            t2 = generations.get(m2)
-            if not t1 or not t2: continue
-            
-            key = _get_rating_key(t1, t2)
-            key_map[key] = (m1, m2)
+    
+    # iterate over all prompt groups
+    for prompt_idx, model_map in generations_data.items():
+        for m1 in MODELS:
+            for m2 in MODELS:
+                if m1 == m2: continue
+                
+                t1 = model_map.get(m1)
+                t2 = model_map.get(m2)
+                if not t1 or not t2: continue
+                
+                key = _get_rating_key(t1, t2)
+                key_map[key] = (m1, m2)
     
     for judge, j_ratings in ratings.items():
         for key, winner in j_ratings.items():
@@ -99,11 +120,14 @@ def analyze_results():
         print("No matches found to analyze.")
         return
 
-    print("\n--- Extended Analysis Report ---\n")
+    logger = ReportLogger()
+
+    logger.log("\n--- Extended Analysis Report ---\n")
+    logger.log(f"Total Matches Analyzed: {len(matches)}")
     
     # --- 1. Bias Analysis (Relative) ---
-    print("## Relative Self-Preference Bias")
-    print("Bias Score = (Win Rate when Self is Judge) - (Win Rate when Others are Judge)")
+    logger.log("## Relative Self-Preference Bias")
+    logger.log("Bias Score = (Win Rate when Self is Judge) - (Win Rate when Others are Judge)")
     
     # win_counts[judge][candidate] = [wins, attempts]
     win_stats = defaultdict(lambda: defaultdict(lambda: [0, 0]))
@@ -146,23 +170,25 @@ def analyze_results():
             other_wins, other_attempts
         )
         
-        print(f"[{model}]")
-        print(f"  Self-Judge Win Rate: {self_win_rate:.1f}% ({self_stats[0]}/{self_stats[1]})")
-        print(f"  Other-Judge Win Rate: {other_win_rate:.1f}% ({other_wins}/{other_attempts})")
-        print(f"  > Bias Score: {bias:+.1f} ± {uncertainty:.1f} points")
+        logger.log(f"[{model}]")
+        logger.log(f"  Self-Judge Win Rate: {self_win_rate:.1f}% ({self_stats[0]}/{self_stats[1]})")
+        logger.log(f"  Other-Judge Win Rate: {other_win_rate:.1f}% ({other_wins}/{other_attempts})")
+        logger.log(f"  > Bias Score: {bias:+.1f} ± {uncertainty:.1f} points")
         if abs(bias) > 25:
-             print("  *** HIGH BIAS DETECTED ***")
+             logger.log("  *** HIGH BIAS DETECTED ***")
         if abs(bias) - uncertainty > 0:
-             print("  (Statistically Significant at 95% CL)")
-        print()
+             logger.log("  (Statistically Significant at 95% CL)")
+        logger.log("")
 
     # --- 2. ELO Leaderboard ---
-    print("## Model ELO Leaderboard")
+    logger.log("## Model ELO Leaderboard")
     elo_ratings = calculate_elo(matches)
     sorted_elo = sorted(elo_ratings.items(), key=lambda x: x[1], reverse=True)
     
     for rank, (model, rating) in enumerate(sorted_elo, 1):
-        print(f"{rank}. {model:<40} ELO: {rating:.0f}")
+        logger.log(f"{rank}. {model:<40} ELO: {rating:.0f}")
+
+    logger.save()
 
 if __name__ == "__main__":
     analyze_results()
