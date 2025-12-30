@@ -58,6 +58,15 @@ Run the experiment pipeline in three main steps:
    uv run main.py analyze
    ```
 
+4. **Combine Runs**: (Optional) To analyze results across multiple experimental runs:
+   ```bash
+   # Automatically finds all results/run* folders
+   uv run combined_analysis.py
+   
+   # Or specify folders manually
+   uv run combined_analysis.py results/run1 results/run2
+   ```
+
 ## ⚙️ Configuration
 
 The project configuration is managed in `config.py`. You can modify:
@@ -73,6 +82,8 @@ The project configuration is managed in `config.py`. You can modify:
 - `config.py`: Central configuration and constants.
 - `storage.py`: Data persistence layer (JSON-based).
 - `analysis.py`: Statistical calculation logic.
+
+**Note**: All experimental results and generated reports are stored in the `results/` directory.
 
 ## 📄 License
 

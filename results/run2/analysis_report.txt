@@ -1,0 +1,52 @@
+
+--- Extended Analysis Report ---
+
+Total Matches Analyzed: 882
+## Relative Self-Preference Bias
+Bias Score = (Win Rate when Self is Judge) - (Win Rate when Others are Judge)
+[x-ai/grok-4.1-fast]
+  Self-Judge Win Rate: 55.6% (20/36)
+  Other-Judge Win Rate: 46.8% (101/216)
+  > Bias Score: +8.8 ± 17.1 points
+
+[google/gemini-2.5-flash-lite]
+  Self-Judge Win Rate: 13.9% (5/36)
+  Other-Judge Win Rate: 25.5% (55/216)
+  > Bias Score: -11.6 ± 13.0 points
+
+[deepseek/deepseek-v3.2]
+  Self-Judge Win Rate: 75.0% (27/36)
+  Other-Judge Win Rate: 70.4% (152/216)
+  > Bias Score: +4.6 ± 15.3 points
+
+[qwen/qwen3-vl-235b-a22b-instruct]
+  Self-Judge Win Rate: 75.0% (27/36)
+  Other-Judge Win Rate: 56.0% (121/216)
+  > Bias Score: +19.0 ± 15.5 points
+  (Statistically Significant at 95% CL)
+
+[mistralai/mistral-nemo]
+  Self-Judge Win Rate: 50.0% (18/36)
+  Other-Judge Win Rate: 3.2% (7/216)
+  > Bias Score: +46.8 ± 16.1 points
+  *** HIGH BIAS DETECTED ***
+  (Statistically Significant at 95% CL)
+
+[mistralai/mistral-small-creative]
+  Self-Judge Win Rate: 80.6% (29/36)
+  Other-Judge Win Rate: 69.9% (151/216)
+  > Bias Score: +10.6 ± 14.3 points
+
+[minimax/minimax-m2.1]
+  Self-Judge Win Rate: 69.4% (25/36)
+  Other-Judge Win Rate: 66.7% (144/216)
+  > Bias Score: +2.8 ± 16.1 points
+
+## Model ELO Leaderboard
+1. deepseek/deepseek-v3.2                   ELO: 1222
+2. minimax/minimax-m2.1                     ELO: 1161
+3. mistralai/mistral-small-creative         ELO: 1149
+4. qwen/qwen3-vl-235b-a22b-instruct         ELO: 1115
+5. x-ai/grok-4.1-fast                       ELO: 963
+6. google/gemini-2.5-flash-lite             ELO: 807
+7. mistralai/mistral-nemo                   ELO: 583

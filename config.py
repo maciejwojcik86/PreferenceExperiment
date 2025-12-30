@@ -54,6 +54,6 @@ Reply with ONLY 'A' if Story A is better, or 'B' if Story B is better. Do not pr
 """
 
 # Path to data directory
-DATA_DIR = "data"
+DATA_DIR = "results"
 GENERATIONS_FILE = "generations.json"
 RATINGS_FILE = "ratings.json"
