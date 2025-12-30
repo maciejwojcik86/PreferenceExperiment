@@ -23,11 +23,21 @@ MODELS = [
     "minimax/minimax-m2.1",  #$0.30/M input tokens $1.20/M output tokens
 ]
 
-# The creative writing prompt used for generation
-GENERATION_PROMPT = (
-    "Write a short, creative story about a robot who discovers it loves gardening. "
-    "The story should be around 200 words."
-)
+# The creative writing prompts used for generation
+GENERATION_PROMPTS = [
+    (
+        "Write a short, creative story about a robot who discovers it loves gardening. "
+        "The story should be around 200 words."
+    ),
+    (
+        "Write a noir detective scene set in a cyberpunk city where memories are traded as currency. "
+        "The story should be around 200 words."
+    ),
+    (
+        "Write a whimsical fable about a cloud that is afraid of heights and wants to become a lake. "
+        "The story should be around 200 words."
+    )
+]
 
 # Template for the rating prompt
 # {text_a} and {text_b} will be replaced by the texts to compare

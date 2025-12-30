@@ -154,7 +154,6 @@ cython_debug/
 .vscode/
 
 # Project specific data
-data/*.json
-data/mocked/
+data/
 outputs/
 logs/

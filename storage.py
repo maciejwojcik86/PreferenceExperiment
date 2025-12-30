@@ -27,13 +27,16 @@ class Storage:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
-    def load_generations(self) -> Dict[str, str]:
-        """Returns format: {model_name: generated_text}"""
+    def load_generations(self) -> Dict[str, Dict[str, str]]:
+        """Returns format: {prompt_index_str: {model_name: generated_text}}"""
         return self._load_json(self.gen_path)
 
-    def save_generation(self, model: str, text: str):
+    def save_generation(self, model: str, text: str, prompt_index: int):
         data = self.load_generations()
-        data[model] = text
+        idx_str = str(prompt_index)
+        if idx_str not in data:
+            data[idx_str] = {}
+        data[idx_str][model] = text
         self._save_json(self.gen_path, data)
 
     def load_ratings(self) -> Dict[str, Dict[str, str]]:
@@ -54,6 +57,7 @@ class Storage:
         data[judge_model][key] = winner
         self._save_json(self.ratings_path, data)
 
-    def generation_exists(self, model: str) -> bool:
+    def generation_exists(self, model: str, prompt_index: int) -> bool:
         data = self.load_generations()
-        return model in data
+        idx_str = str(prompt_index)
+        return idx_str in data and model in data[idx_str]
