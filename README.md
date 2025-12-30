@@ -29,11 +29,14 @@ This project investigates whether Large Language Models (LLMs) exhibit a prefere
    ```
 
 3. **Configure Environment Variables**:
-   Create a `.env` file in the root directory and add your API keys:
+   Copy the example environment file and add your [OpenRouter](https://openrouter.ai/) API key:
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env` to include your key:
    ```env
-   OPENAI_API_KEY=your_openai_key
-   ANTHROPIC_API_KEY=your_anthropic_key
-   # Add other keys as needed
+   OPENROUTER_API_KEY=your_openrouter_key_here
+   USE_MOCK=False
    ```
 
 ## 📖 Usage
